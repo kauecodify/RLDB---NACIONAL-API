@@ -1,0 +1,1596 @@
+openapi: 3.1.0
+info:
+  title: RLDB - API UNIVERSAL - TR8 Nacional
+  description: |
+    API de Controle da Rede Logística Digital Brasileira (RLDB) - Solução TR8 Nacional
+    
+    Esta API fornece uma solução consolidada para o problema da operação logística nacional,
+    adaptável para qualquer cenário de transporte e logística no Brasil.
+    
+    A solução TR8 Nacional é projetada para ser:
+    - Neutra: todos os operadores usam os mesmos endpoints
+    - Segura: conformidade total com LGPD e regulamentações
+    - Flexível: adaptável a qualquer tipo de operação
+    - Escalável: suporte a milhões de requisições
+    - Auditável: rastreamento completo de todas as operações
+  version: 2.0.0
+  contact:
+    name: RLDB API Support
+    email: api-support@rldb.gov.br
+    url: https://rldb.gov.br/api-support
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.rldb.gov.br
+    description: Production server
+  - url: https://sandbox.rldb.gov.br
+    description: Sandbox server for testing
+  - url: http://localhost:8080
+    description: Development server
+
+tags:
+  - name: Authentication
+    description: Authentication endpoints
+  - name: TR8 Nacional
+    description: TR8 nacional shipping operations
+  - name: Observatory
+    description: Observatory metrics and analytics
+  - name: Governance
+    description: Data governance and compliance
+
+paths:
+  /api/v1/auth/token:
+    post:
+      tags:
+        - Authentication
+      summary: Get access token
+      description: Returns a JWT access token for API authentication
+      operationId: getAccessToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
+      responses:
+        '200':
+          description: Access token granted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/nacional/tr8/cotacoes:
+    post:
+      tags:
+        - TR8 Nacional
+      summary: Get TR8 Nacional Shipping Quotes
+      description: Returns available shipping quotes for TR8 nacional shipments
+      operationId: getTR8NacionalQuotes
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SolicitacaoCotacao'
+      responses:
+        '200':
+          description: List of shipping quotes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RespostaCotacao'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/nacional/tr8/remessas:
+    post:
+      tags:
+        - TR8 Nacional
+      summary: Create TR8 Nacional Remessa
+      description: Creates a new TR8 nacional shipment
+      operationId: createTR8NacionalRemessa
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SolicitacaoRemessa'
+      responses:
+        '201':
+          description: Remessa created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespostaRemessa'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict (duplicate idempotency key)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/nacional/tr8/remessas/{id_remessa}:
+    get:
+      tags:
+        - TR8 Nacional
+      summary: Get TR8 Nacional Remessa
+      description: Retrieves a TR8 nacional remessa by its ID
+      operationId: getTR8NacionalRemessa
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id_remessa
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The remessa ID
+      responses:
+        '200':
+          description: Remessa details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemessaNacional'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Remessa not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/nacional/tr8/rastreamento/{codigo_rastreamento}:
+    get:
+      tags:
+        - TR8 Nacional
+      summary: Get TR8 Nacional Tracking Information
+      description: Retrieves tracking information for a TR8 nacional remessa
+      operationId: getTR8NacionalTracking
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: codigo_rastreamento
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The tracking code
+      responses:
+        '200':
+          description: Tracking information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespostaRastreamento'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Tracking code not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      tags:
+        - TR8 Nacional
+      summary: Update TR8 Nacional Tracking
+      description: Updates tracking information for a TR8 nacional remessa
+      operationId: updateTR8NacionalTracking
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: codigo_rastreamento
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The tracking code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  description: New status
+                  example: "em_transito"
+                local:
+                  type: string
+                  description: Current location
+                  example: "CD São Paulo"
+                uf:
+                  type: string
+                  description: Current UF
+                  example: "SP"
+                descricao:
+                  type: string
+                  description: Status description
+                  example: "Pacote chegou no centro de distribuição"
+              required:
+                - status
+                - local
+                - uf
+      responses:
+        '200':
+          description: Tracking updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Tracking code not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/nacional/tr8/documentos/fiscais:
+    post:
+      tags:
+        - TR8 Nacional
+      summary: Create Fiscal Document
+      description: Creates a fiscal document for a TR8 nacional remessa
+      operationId: createFiscalDocument
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id_remessa:
+                  type: string
+                  description: The remessa ID
+                  example: "TR8-123456789"
+                tipo:
+                  type: string
+                  description: Type of fiscal document
+                  example: "nfce"
+                numero:
+                  type: string
+                  description: Document number
+                  example: "123456"
+                emitente:
+                  type: string
+                  description: Document issuer
+                  example: "Empresa XYZ"
+              required:
+                - id_remessa
+                - tipo
+                - numero
+                - emitente
+      responses:
+        '201':
+          description: Document created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentoFiscal'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/nacional/tr8/documentos/fiscais/{documento_id}:
+    get:
+      tags:
+        - TR8 Nacional
+      summary: Get Fiscal Document
+      description: Retrieves a fiscal document by ID
+      operationId: getFiscalDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: documento_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The document ID
+      responses:
+        '200':
+          description: Document details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentoFiscal'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Document not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/nacional/tr8/documentos/fiscais/{documento_id}/validar:
+    put:
+      tags:
+        - TR8 Nacional
+      summary: Validate Fiscal Document
+      description: Validates a fiscal document for a TR8 nacional remessa
+      operationId: validateFiscalDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: documento_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The document ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                verificado:
+                  type: boolean
+                  description: Whether the document is verified
+                  example: true
+              required:
+                - verificado
+      responses:
+        '200':
+          description: Document validation updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Document not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/nacional/tr8/webhooks:
+    post:
+      tags:
+        - TR8 Nacional
+      summary: Create Webhook
+      description: Creates a webhook configuration for TR8 nacional events
+      operationId: createWebhook
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookNacional'
+      responses:
+        '201':
+          description: Webhook created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookNacional'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      tags:
+        - TR8 Nacional
+      summary: Get Webhooks
+      description: Retrieves webhook configurations for the current client
+      operationId: getWebhooks
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of webhooks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WebhookNacional'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/observatorio/nacional/tr8/metricas:
+    get:
+      tags:
+        - Observatory
+      summary: Get TR8 Nacional Metrics
+      description: Returns metrics for TR8 nacional operations
+      operationId: getTR8NacionalMetrics
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: periodo
+          in: query
+          schema:
+            type: string
+            enum: [ultimas_24_horas, ultimos_7_dias, ultimos_30_dias, hoje]
+            default: ultimos_30_dias
+          description: Time period for metrics
+      responses:
+        '200':
+          description: TR8 nacional metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricasNacional'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/observatorio/nacional/tr8/conformidade:
+    get:
+      tags:
+        - Observatory
+      summary: Get TR8 Nacional Compliance Report
+      description: Returns compliance report for TR8 nacional operations
+      operationId: getTR8NacionalComplianceReport
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: periodo
+          in: query
+          schema:
+            type: string
+            enum: [ultimas_24_horas, ultimos_7_dias, ultimos_30_dias, hoje]
+            default: ultimos_30_dias
+          description: Time period for compliance report
+      responses:
+        '200':
+          description: TR8 nacional compliance report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelatorioConformidade'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Returns the health status of the API
+      operationId: healthCheck
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  version:
+                    type: string
+                    example: v2
+                  timestamp:
+                    type: string
+                    format: date-time
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Invalid request"
+
+    TokenRequest:
+      type: object
+      properties:
+        client_id:
+          type: string
+          description: Client ID
+          example: "transportadora_abc"
+        client_secret:
+          type: string
+          description: Client secret
+          example: "your-client-secret"
+        scope:
+          type: string
+          description: Requested scopes
+          example: "logistics:read logistics:write tracking:read"
+      required:
+        - client_id
+        - client_secret
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          description: JWT access token
+        token_type:
+          type: string
+          description: Token type
+          example: Bearer
+        expires_in:
+          type: integer
+          description: Token expiration in seconds
+          example: 900
+        scope:
+          type: string
+          description: Granted scopes
+          example: "logistics:read logistics:write tracking:read"
+
+    Dimensoes:
+      type: object
+      properties:
+        comprimento:
+          type: number
+          format: float
+          description: Length in centimeters
+          example: 30.0
+        largura:
+          type: number
+          format: float
+          description: Width in centimeters
+          example: 20.0
+        altura:
+          type: number
+          format: float
+          description: Height in centimeters
+          example: 15.0
+
+    Destinatario:
+      type: object
+      properties:
+        nome_hash:
+          type: string
+          description: Hashed recipient name
+          example: "a3f8c2..."
+        endereco_hash:
+          type: string
+          description: Hashed address
+          example: "b7e1d4..."
+        bairro_hash:
+          type: string
+          description: Hashed neighborhood
+          example: "c8f2e1..."
+        cidade_hash:
+          type: string
+          description: Hashed city
+          example: "d9g0h1..."
+        uf:
+          type: string
+          description: State
+          example: "SP"
+        cep:
+          type: string
+          description: ZIP code
+          example: "01001-000"
+        telefone_hash:
+          type: string
+          description: Hashed phone number
+          example: "e0i1j2..."
+        email_hash:
+          type: string
+          description: Hashed email
+          example: "f1k2l3..."
+        cpf_cnpj_hash:
+          type: string
+          description: Hashed CPF/CNPJ
+          example: "g4m5n6..."
+
+    Remetente:
+      type: object
+      properties:
+        nome_hash:
+          type: string
+          description: Hashed sender name
+          example: "a3f8c2..."
+        endereco_hash:
+          type: string
+          description: Hashed address
+          example: "b7e1d4..."
+        bairro_hash:
+          type: string
+          description: Hashed neighborhood
+          example: "c8f2e1..."
+        cidade_hash:
+          type: string
+          description: Hashed city
+          example: "d9g0h1..."
+        uf:
+          type: string
+          description: State
+          example: "SP"
+        cep:
+          type: string
+          description: ZIP code
+          example: "01001-000"
+        telefone_hash:
+          type: string
+          description: Hashed phone number
+          example: "e0i1j2..."
+        email_hash:
+          type: string
+          description: Hashed email
+          example: "f1k2l3..."
+        cpf_cnpj_hash:
+          type: string
+          description: Hashed CPF/CNPJ
+          example: "g4m5n6..."
+        ie_hash:
+          type: string
+          description: Hashed state registration
+          example: "h7o8p9..."
+
+    SolicitacaoCotacao:
+      type: object
+      properties:
+        origem_cep:
+          type: string
+          description: Origin ZIP code
+          example: "01001-000"
+        destino_cep:
+          type: string
+          description: Destination ZIP code
+          example: "69005-270"
+        peso_kg:
+          type: number
+          format: float
+          description: Package weight in kilograms
+          example: 2.5
+        dimensoes_cm:
+          $ref: '#/components/schemas/Dimensoes'
+        valor_declarado_brl:
+          type: number
+          format: float
+          description: Declared value in Brazilian Reais
+          example: 150.00
+        modalidade_frete:
+          type: string
+          description: Freight modality (cif, fob, por_conta)
+          example: "cif"
+        tipo_servico:
+          type: string
+          description: Service type (normal, expresso, economico, agendado)
+          example: "normal"
+        reversa_logistica:
+          type: boolean
+          description: Enable reverse logistics
+          default: false
+        seguro_obrigatorio:
+          type: boolean
+          description: Mandatory insurance
+          default: false
+        coletar:
+          type: boolean
+          description: Enable pickup
+          default: false
+        entregar:
+          type: boolean
+          description: Enable delivery
+          default: false
+        agendamento:
+          type: string
+          description: Scheduling information
+          example: "2024-01-15 10:00"
+        observacoes:
+          type: string
+          description: Additional observations
+          example: "Pacote frágil"
+      required:
+        - origem_cep
+        - destino_cep
+        - peso_kg
+        - valor_declarado_brl
+        - modalidade_frete
+        - tipo_servico
+
+    RespostaCotacao:
+      type: object
+      properties:
+        operador:
+          type: string
+          description: Operator name
+          example: "correios"
+        servico:
+          type: string
+          description: Service name
+          example: "sedex"
+        valor_frete_brl:
+          type: number
+          format: float
+          description: Shipping price in BRL
+          example: 48.90
+        valor_minimo_brl:
+          type: number
+          format: float
+          description: Minimum shipping price in BRL
+          example: 45.00
+        prazo_entrega_dias:
+          type: integer
+          description: Estimated delivery days
+          example: 5
+        prazo_minimo_dias:
+          type: integer
+          description: Minimum delivery days
+          example: 3
+        prazo_maximo_dias:
+          type: integer
+          description: Maximum delivery days
+          example: 7
+        modalidade_frete:
+          type: string
+          description: Freight modality
+          example: "cif"
+        tipo_servico:
+          type: string
+          description: Service type
+          example: "expresso"
+        inclui_seguro:
+          type: boolean
+          description: Includes insurance
+          example: true
+        inclui_reversa:
+          type: boolean
+          description: Includes reverse logistics
+          example: false
+        inclui_coleta:
+          type: boolean
+          description: Includes pickup
+          example: false
+        inclui_entrega:
+          type: boolean
+          description: Includes delivery
+          example: true
+        co2_kg:
+          type: number
+          format: float
+          description: CO2 emissions in kg
+          example: 1.2
+        notas:
+          type: string
+          description: Additional notes
+          example: "Entrega em até 5 dias úteis"
+        disponivel:
+          type: boolean
+          description: Service availability
+          example: true
+        id_cotacao:
+          type: string
+          description: Quote ID
+          example: "cot-123456789"
+
+    SolicitacaoRemessa:
+      type: object
+      properties:
+        operador:
+          type: string
+          description: Operator name
+          example: "correios"
+        servico:
+          type: string
+          description: Service name
+          example: "sedex"
+        id_remessa:
+          type: string
+          description: Unique remessa ID
+          example: "ML-987654321"
+        origem_cep:
+          type: string
+          description: Origin ZIP code
+          example: "01001-000"
+        destino_cep:
+          type: string
+          description: Destination ZIP code
+          example: "69005-270"
+        origem_uf:
+          type: string
+          description: Origin state
+          example: "SP"
+        destino_uf:
+          type: string
+          description: Destination state
+          example: "AM"
+        origem_municipio:
+          type: string
+          description: Origin municipality
+          example: "Sao Paulo"
+        destino_municipio:
+          type: string
+          description: Destination municipality
+          example: "Manaus"
+        peso_kg:
+          type: number
+          format: float
+          description: Package weight in kilograms
+          example: 2.5
+        dimensoes_cm:
+          $ref: '#/components/schemas/Dimensoes'
+        valor_declarado_brl:
+          type: number
+          format: float
+          description: Declared value in BRL
+          example: 150.00
+        valor_frete_brl:
+          type: number
+          format: float
+          description: Shipping price in BRL
+          example: 48.90
+        modalidade_frete:
+          type: string
+          description: Freight modality
+          example: "cif"
+        tipo_produto:
+          type: string
+          description: Product type
+          example: "eletroeletronicos"
+        nfce:
+          type: string
+          description: NFCe number
+          example: "123456"
+        cte:
+          type: string
+          description: CTe number
+          example: "789012"
+        reversa_logistica:
+          type: boolean
+          description: Enable reverse logistics
+          default: false
+        coletar:
+          type: boolean
+          description: Enable pickup
+          default: false
+        entregar:
+          type: boolean
+          description: Enable delivery
+          default: false
+        destinatario:
+          $ref: '#/components/schemas/Destinatario'
+        remetente:
+          $ref: '#/components/schemas/Remetente'
+        chave_idempotencia:
+          type: string
+          description: Idempotency key for duplicate prevention
+          example: "unique-key-123"
+      required:
+        - operador
+        - servico
+        - id_remessa
+        - origem_cep
+        - destino_cep
+        - peso_kg
+        - valor_declarado_brl
+        - valor_frete_brl
+        - modalidade_frete
+
+    RespostaRemessa:
+      type: object
+      properties:
+        codigo_rastreamento:
+          type: string
+          description: Tracking code
+          example: "BR123456789012"
+        url_etiqueta:
+          type: string
+          description: URL to download the shipping label
+          example: "https://rldb.gov.br/etiquetas/abc123.pdf"
+        previsao_entrega:
+          type: string
+          format: date-time
+          description: Estimated delivery date
+        rota_hubs:
+          type: array
+          items:
+            type: string
+          description: Route through hubs
+          example: ["Hub SP", "Hub AM"]
+        id_remessa:
+          type: string
+          description: Remessa ID
+          example: "ML-987654321"
+        operador:
+          type: string
+          description: Operator name
+          example: "correios"
+        servico:
+          type: string
+          description: Service name
+          example: "sedex"
+        valor_frete_brl:
+          type: number
+          format: float
+          description: Shipping price in BRL
+          example: 48.90
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+
+    RemessaNacional:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Remessa ID
+        id_remessa:
+          type: string
+          description: External remessa ID
+        operador:
+          type: string
+          description: Operator name
+        servico:
+          type: string
+          description: Service name
+        tipo_operacao:
+          type: string
+          description: Operation type
+          example: "entrega"
+        origem_cep:
+          type: string
+          description: Origin ZIP code
+        destino_cep:
+          type: string
+          description: Destination ZIP code
+        origem_uf:
+          type: string
+          description: Origin state
+        destino_uf:
+          type: string
+          description: Destination state
+        origem_municipio:
+          type: string
+          description: Origin municipality
+        destino_municipio:
+          type: string
+          description: Destination municipality
+        peso_kg:
+          type: number
+          format: float
+          description: Package weight
+        dimensoes_cm:
+          $ref: '#/components/schemas/Dimensoes'
+        valor_declarado_brl:
+          type: number
+          format: float
+          description: Declared value in BRL
+        valor_frete_brl:
+          type: number
+          format: float
+          description: Shipping price in BRL
+        modalidade_frete:
+          type: string
+          description: Freight modality
+        tipo_produto:
+          type: string
+          description: Product type
+        nfce:
+          type: string
+          description: NFCe number
+        cte:
+          type: string
+          description: CTe number
+        reversa_logistica:
+          type: boolean
+          description: Enable reverse logistics
+        status:
+          type: string
+          description: Remessa status
+          example: "pendente"
+        codigo_rastreamento:
+          type: string
+          description: Tracking code
+        url_etiqueta:
+          type: string
+          description: Label URL
+        previsao_entrega:
+          type: string
+          format: date-time
+          description: Estimated delivery
+        data_entrega:
+          type: string
+          format: date-time
+          description: Actual delivery date
+        data_coletado:
+          type: string
+          format: date-time
+          description: Pickup date
+        data_postagem:
+          type: string
+          format: date-time
+          description: Posting date
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+        metadados:
+          type: object
+          additionalProperties: true
+          description: Additional metadata
+
+    EventoRastreamento:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Event ID
+        id_remessa:
+          type: string
+          description: Remessa ID
+        codigo_rastreamento:
+          type: string
+          description: Tracking code
+        timestamp:
+          type: string
+          format: date-time
+          description: Event timestamp
+        local:
+          type: string
+          description: Event location
+        uf:
+          type: string
+          description: Event state
+        cep:
+          type: string
+          description: Event ZIP code
+        status:
+          type: string
+          description: Event status
+        operador:
+          type: string
+          description: Operator name
+        descricao:
+          type: string
+          description: Event description
+        lat_long:
+          type: string
+          description: Latitude and longitude
+        foto_url:
+          type: string
+          description: Photo URL
+        assinatura:
+          type: string
+          description: Signature
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+
+    EventoRastreamentoSimples:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Event timestamp
+        local:
+          type: string
+          description: Event location
+        uf:
+          type: string
+          description: Event state
+        status:
+          type: string
+          description: Event status
+        operador:
+          type: string
+          description: Operator name
+        descricao:
+          type: string
+          description: Event description
+
+    DocumentoFiscal:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Document ID
+        id_remessa:
+          type: string
+          description: Remessa ID
+        tipo:
+          type: string
+          description: Document type
+          example: "nfce"
+        numero:
+          type: string
+          description: Document number
+        serie:
+          type: string
+          description: Document series
+        chave_acesso:
+          type: string
+          description: Access key
+        data_emissao:
+          type: string
+          format: date-time
+          description: Issue date
+        valor_brl:
+          type: number
+          format: float
+          description: Value in BRL
+        cfop:
+          type: string
+          description: CFOP code
+        icms:
+          type: number
+          format: float
+          description: ICMS value
+        ipi:
+          type: number
+          format: float
+          description: IPI value
+        pis:
+          type: number
+          format: float
+          description: PIS value
+        cofins:
+          type: number
+          format: float
+          description: COFINS value
+        emitente:
+          type: string
+          description: Document issuer
+        destinatario:
+          type: string
+          description: Document recipient
+        status:
+          type: string
+          description: Document status
+        arquivo_url:
+          type: string
+          description: URL to download document
+        xml_url:
+          type: string
+          description: URL to download XML
+        verificado:
+          type: boolean
+          description: Whether document is verified
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+
+    DocumentoInfo:
+      type: object
+      properties:
+        tipo:
+          type: string
+          description: Document type
+        numero:
+          type: string
+          description: Document number
+        status:
+          type: string
+          description: Document status
+        verificado:
+          type: boolean
+          description: Whether document is verified
+        arquivo_url:
+          type: string
+          description: URL to download document
+
+    StatusHistorico:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Status
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp
+        responsavel:
+          type: string
+          description: Responsible
+        motivo:
+          type: string
+          description: Reason
+
+    RespostaRastreamento:
+      type: object
+      properties:
+        codigo_rastreamento:
+          type: string
+          description: Tracking code
+        status:
+          type: string
+          description: Current status
+        eventos:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventoRastreamentoSimples'
+        previsao_entrega:
+          type: string
+          format: date-time
+          description: Estimated delivery date
+        data_entrega:
+          type: string
+          format: date-time
+          description: Actual delivery date
+        operador:
+          type: string
+          description: Operator name
+        servico:
+          type: string
+          description: Service name
+        origem_cep:
+          type: string
+          description: Origin ZIP code
+        destino_cep:
+          type: string
+          description: Destination ZIP code
+        peso_kg:
+          type: number
+          format: float
+          description: Package weight
+        valor_declarado_brl:
+          type: number
+          format: float
+          description: Declared value in BRL
+        documentos:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentoInfo'
+        historico_status:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatusHistorico'
+
+    WebhookNacional:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Webhook ID
+        client_id:
+          type: string
+          description: Client ID
+        url:
+          type: string
+          description: Webhook URL
+          example: "https://api.transportadora.com/webhooks/rldb"
+        eventos:
+          type: array
+          items:
+            type: string
+          description: Events to subscribe to
+          example: ["rastreamento.atualizado", "remessa.entregue"]
+        segredo:
+          type: string
+          description: Webhook secret for HMAC verification
+        ativo:
+          type: boolean
+          description: Whether webhook is active
+          default: true
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+
+    UFMetric:
+      type: object
+      properties:
+        uf:
+          type: string
+          description: State code
+        remessas_count:
+          type: integer
+          description: Number of remessas
+        valor_brl:
+          type: number
+          format: float
+          description: Total value in BRL
+        media_dias:
+          type: number
+          format: float
+          description: Average delivery days
+
+    OperadorMetric:
+      type: object
+      properties:
+        operador:
+          type: string
+          description: Operator name
+        remessas_count:
+          type: integer
+          description: Number of remessas
+        valor_brl:
+          type: number
+          format: float
+          description: Total value in BRL
+        media_dias:
+          type: number
+          format: float
+          description: Average delivery days
+
+    ServicoMetric:
+      type: object
+      properties:
+        servico:
+          type: string
+          description: Service name
+        remessas_count:
+          type: integer
+          description: Number of remessas
+        valor_brl:
+          type: number
+          format: float
+          description: Total value in BRL
+        media_dias:
+          type: number
+          format: float
+          description: Average delivery days
+
+    MetricasNacional:
+      type: object
+      properties:
+        periodo:
+          type: string
+          description: Time period
+          example: "2024-01-01/2024-01-31"
+        total_remessas:
+          type: integer
+          description: Total number of remessas
+        total_valor_brl:
+          type: number
+          format: float
+          description: Total value in BRL
+        media_dias_entrega:
+          type: number
+          format: float
+          description: Average delivery days
+        taxa_entrega_no_prazo:
+          type: number
+          format: float
+          description: On-time delivery rate
+        media_custo_por_kg_brl:
+          type: number
+          format: float
+          description: Average cost per kg in BRL
+        co2_por_pacote_kg:
+          type: number
+          format: float
+          description: Average CO2 per package in kg
+        taxa_reversa_logistica:
+          type: number
+          format: float
+          description: Reverse logistics rate
+        taxa_coletas_realizadas:
+          type: number
+          format: float
+          description: Pickup completion rate
+        top_destinos:
+          type: array
+          items:
+            $ref: '#/components/schemas/UFMetric'
+        top_operadores:
+          type: array
+          items:
+            $ref: '#/components/schemas/OperadorMetric'
+        top_tipos_servico:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServicoMetric'
+
+    OperadorConformidade:
+      type: object
+      properties:
+        operador:
+          type: string
+          description: Operator name
+        solicitacoes:
+          type: integer
+          description: Number of requests made
+        bloqueadas:
+          type: integer
+          description: Number of requests blocked
+        campos_acessados:
+          type: array
+          items:
+            type: string
+          description: Data fields accessed
+        score_conformidade:
+          type: number
+          format: float
+          description: Compliance score (0-1)
+
+    RelatorioConformidade:
+      type: object
+      properties:
+        periodo:
+          type: string
+          description: Time period
+        data_geracao:
+          type: string
+          format: date-time
+          description: Report generation timestamp
+        total_solicitacoes:
+          type: integer
+          description: Total number of requests
+        solicitacoes_bloqueadas:
+          type: integer
+          description: Number of blocked requests
+        campos_sanitizados:
+          type: integer
+          description: Number of sanitized fields
+        violacoes_acesso:
+          type: integer
+          description: Number of data access violations
+        logs_auditados:
+          type: integer
+          description: Number of audit logs
+        operadores:
+          type: array
+          items:
+            $ref: '#/components/schemas/OperadorConformidade'
+
+security:
+  - bearerAuth: []

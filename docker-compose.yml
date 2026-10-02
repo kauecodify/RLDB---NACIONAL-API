@@ -1,0 +1,132 @@
+version: '3.8'
+
+services:
+  # API Service
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rldb-api-universal
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_PORT=8080
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=rldb_user
+      - DB_PASSWORD=rldb_password
+      - DB_NAME=rldb_api
+      - DB_SSL_MODE=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=rldb-secret-key-change-me
+      - JWT_ISSUER=rldb-api-universal
+      - JWT_AUDIENCE=rldb-clients
+      - TR8_ENABLED=true
+      - GOVERNANCE_ENABLED=true
+      - AUDIT_ENABLED=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - rldb-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: rldb-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=rldb_user
+      - POSTGRES_PASSWORD=rldb_password
+      - POSTGRES_DB=rldb_api
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - rldb-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rldb_user -d rldb_api"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: rldb-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - rldb-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PGAdmin (Optional, for development)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: rldb-pgadmin
+    restart: unless-stopped
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@rldb.gov.br
+      - PGADMIN_DEFAULT_PASSWORD=admin123
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - rldb-network
+
+  # Prometheus (Optional, for monitoring)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: rldb-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - rldb-network
+
+  # Grafana (Optional, for monitoring)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: rldb-grafana
+    restart: unless-stopped
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - rldb-network
+
+networks:
+  rldb-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:

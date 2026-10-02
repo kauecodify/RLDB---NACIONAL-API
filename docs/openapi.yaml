@@ -1,0 +1,1522 @@
+openapi: 3.1.0
+info:
+  title: RLDB - API UNIVERSAL
+  description: |
+    API de Controle da Rede Logística Digital Brasileira (RLDB) - Integração Crossborder TR8
+    
+    Esta API funciona como um orquestrador neutro, permitindo que qualquer participante autorizado
+    troque dados operacionais sem expor informações competitivas.
+    
+    A integração TR8 (Transporte Rodoviário Internacional de Cargas) permite operações crossborder
+    entre Brasil e outros países, com conformidade total às regulamentações de comércio exterior.
+  version: 1.0.0
+  contact:
+    name: RLDB API Support
+    email: api-support@rldb.gov.br
+    url: https://rldb.gov.br/api-support
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.rldb.gov.br
+    description: Production server
+  - url: https://sandbox.rldb.gov.br
+    description: Sandbox server for testing
+  - url: http://localhost:8080
+    description: Development server
+
+tags:
+  - name: Authentication
+    description: Authentication endpoints
+  - name: TR8 Crossborder
+    description: TR8 crossborder shipping operations
+  - name: Observatory
+    description: Observatory metrics and analytics
+  - name: Governance
+    description: Data governance and compliance
+
+paths:
+  /api/v1/auth/token:
+    post:
+      tags:
+        - Authentication
+      summary: Get access token
+      description: Returns a JWT access token for API authentication
+      operationId: getAccessToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
+      responses:
+        '200':
+          description: Access token granted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/crossborder/tr8/quotes:
+    post:
+      tags:
+        - TR8 Crossborder
+      summary: Get TR8 shipping quotes
+      description: Returns available shipping quotes for TR8 international shipments
+      operationId: getTR8Quotes
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TR8QuoteRequest'
+      responses:
+        '200':
+          description: List of shipping quotes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CrossborderQuote'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/crossborder/tr8/shipments:
+    post:
+      tags:
+        - TR8 Crossborder
+      summary: Create TR8 shipment
+      description: Creates a new TR8 international shipment
+      operationId: createTR8Shipment
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TR8ShipmentRequest'
+      responses:
+        '201':
+          description: Shipment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TR8ShipmentResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict (duplicate idempotency key)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/crossborder/tr8/shipments/{shipment_id}:
+    get:
+      tags:
+        - TR8 Crossborder
+      summary: Get TR8 shipment
+      description: Retrieves a TR8 shipment by its ID
+      operationId: getTR8Shipment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: shipment_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The shipment ID
+      responses:
+        '200':
+          description: Shipment details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CrossborderShipment'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Shipment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/crossborder/tr8/tracking/{tracking_code}:
+    get:
+      tags:
+        - TR8 Crossborder
+      summary: Get TR8 tracking
+      description: Retrieves tracking information for a TR8 shipment
+      operationId: getTR8Tracking
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tracking_code
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The tracking code
+      responses:
+        '200':
+          description: Tracking information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TR8TrackingResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Tracking code not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      tags:
+        - TR8 Crossborder
+      summary: Update TR8 tracking
+      description: Updates tracking information for a TR8 shipment
+      operationId: updateTR8Tracking
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tracking_code
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The tracking code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  description: New status
+                  example: "in_transit"
+                location:
+                  type: string
+                  description: Current location
+                  example: "Sao Paulo Hub"
+                country:
+                  type: string
+                  description: Current country
+                  example: "BR"
+                description:
+                  type: string
+                  description: Status description
+                  example: "Package arrived at hub"
+              required:
+                - status
+                - location
+                - country
+      responses:
+        '200':
+          description: Tracking updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Tracking code not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/crossborder/tr8/customs/documents:
+    post:
+      tags:
+        - TR8 Crossborder
+      summary: Create customs document
+      description: Creates a customs document for a TR8 shipment
+      operationId: createCustomsDocument
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                shipment_id:
+                  type: string
+                  description: The shipment ID
+                  example: "TR8-123456789"
+                document_type:
+                  type: string
+                  description: Type of customs document
+                  example: "commercial_invoice"
+                document_number:
+                  type: string
+                  description: Document number
+                  example: "CI-2024-00001"
+                issuing_country:
+                  type: string
+                  description: Country issuing the document
+                  example: "BR"
+              required:
+                - shipment_id
+                - document_type
+                - document_number
+                - issuing_country
+      responses:
+        '201':
+          description: Document created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CrossborderCustomsDocument'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/crossborder/tr8/customs/documents/{document_id}:
+    get:
+      tags:
+        - TR8 Crossborder
+      summary: Get customs document
+      description: Retrieves a customs document by ID
+      operationId: getCustomsDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The document ID
+      responses:
+        '200':
+          description: Document details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CrossborderCustomsDocument'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Document not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/crossborder/tr8/customs/documents/{document_id}/validate:
+    put:
+      tags:
+        - TR8 Crossborder
+      summary: Validate customs document
+      description: Validates a customs document for a TR8 shipment
+      operationId: validateCustomsDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The document ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                verified:
+                  type: boolean
+                  description: Whether the document is verified
+                  example: true
+              required:
+                - verified
+      responses:
+        '200':
+          description: Document validation updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Document not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/crossborder/tr8/webhooks:
+    post:
+      tags:
+        - TR8 Crossborder
+      summary: Create webhook
+      description: Creates a webhook configuration for TR8 events
+      operationId: createWebhook
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrossborderWebhook'
+      responses:
+        '201':
+          description: Webhook created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CrossborderWebhook'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      tags:
+        - TR8 Crossborder
+      summary: Get webhooks
+      description: Retrieves webhook configurations for the current client
+      operationId: getWebhooks
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of webhooks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CrossborderWebhook'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/observatory/tr8/metrics:
+    get:
+      tags:
+        - Observatory
+      summary: Get TR8 metrics
+      description: Returns metrics for TR8 crossborder operations
+      operationId: getTR8Metrics
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [last_24_hours, last_7_days, last_30_days, today]
+            default: last_30_days
+          description: Time period for metrics
+      responses:
+        '200':
+          description: TR8 metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TR8MetricsResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/observatory/tr8/compliance:
+    get:
+      tags:
+        - Observatory
+      summary: Get TR8 compliance report
+      description: Returns compliance report for TR8 operations
+      operationId: getTR8ComplianceReport
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [last_24_hours, last_7_days, last_30_days, today]
+            default: last_30_days
+          description: Time period for compliance report
+      responses:
+        '200':
+          description: TR8 compliance report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TR8ComplianceReport'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/governance/tr8/config:
+    get:
+      tags:
+        - Governance
+      summary: Get governance configuration
+      description: Returns the TR8 governance configuration
+      operationId: getGovernanceConfig
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Governance configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TR8GovernanceConfig'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Returns the health status of the API
+      operationId: healthCheck
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  version:
+                    type: string
+                    example: v1
+                  timestamp:
+                    type: string
+                    format: date-time
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Invalid request"
+
+    TokenRequest:
+      type: object
+      properties:
+        client_id:
+          type: string
+          description: Client ID
+          example: "shopee_br_001"
+        client_secret:
+          type: string
+          description: Client secret
+          example: "your-client-secret"
+        scope:
+          type: string
+          description: Requested scopes
+          example: "logistics:read logistics:write tracking:read"
+      required:
+        - client_id
+        - client_secret
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          description: JWT access token
+        token_type:
+          type: string
+          description: Token type
+          example: Bearer
+        expires_in:
+          type: integer
+          description: Token expiration in seconds
+          example: 900
+        scope:
+          type: string
+          description: Granted scopes
+          example: "logistics:read logistics:write tracking:read"
+
+    Dimensions:
+      type: object
+      properties:
+        l:
+          type: number
+          format: float
+          description: Length in centimeters
+          example: 30.0
+        w:
+          type: number
+          format: float
+          description: Width in centimeters
+          example: 20.0
+        h:
+          type: number
+          format: float
+          description: Height in centimeters
+          example: 15.0
+
+    Recipient:
+      type: object
+      properties:
+        name_hash:
+          type: string
+          description: Hashed recipient name
+          example: "a3f8c2..."
+        address_hash:
+          type: string
+          description: Hashed address
+          example: "b7e1d4..."
+        city_hash:
+          type: string
+          description: Hashed city
+          example: "c8f2e1..."
+        state:
+          type: string
+          description: State
+          example: "SP"
+        country:
+          type: string
+          description: Country
+          example: "BR"
+        postal_code:
+          type: string
+          description: Postal code
+          example: "01001-000"
+        phone_hash:
+          type: string
+          description: Hashed phone number
+          example: "d9g0h1..."
+        email_hash:
+          type: string
+          description: Hashed email
+          example: "e0i1j2..."
+
+    TR8QuoteRequest:
+      type: object
+      properties:
+        origin_country:
+          type: string
+          description: Origin country code
+          example: "BR"
+        destination_country:
+          type: string
+          description: Destination country code
+          example: "US"
+        origin_zip:
+          type: string
+          description: Origin ZIP code
+          example: "01001-000"
+        destination_zip:
+          type: string
+          description: Destination ZIP code
+          example: "90210"
+        weight_kg:
+          type: number
+          format: float
+          description: Package weight in kilograms
+          example: 2.5
+        dimensions_cm:
+          $ref: '#/components/schemas/Dimensions'
+        declared_value_brl:
+          type: number
+          format: float
+          description: Declared value in Brazilian Reais
+          example: 150.00
+        declared_value_usd:
+          type: number
+          format: float
+          description: Declared value in US Dollars
+          example: 30.00
+        incoterm:
+          type: string
+          description: Incoterm (e.g., FOB, CIF, DDP)
+          example: "FOB"
+        hs_code:
+          type: string
+          description: Harmonized System code
+          example: "6109.10.00"
+        product_category:
+          type: string
+          description: Product category
+          example: "electronics"
+        service_level:
+          type: string
+          description: Service level
+          example: "standard"
+        customs_required:
+          type: boolean
+          description: Whether customs clearance is required
+          default: true
+        insurance_required:
+          type: boolean
+          description: Whether insurance is required
+          default: false
+      required:
+        - origin_country
+        - destination_country
+        - origin_zip
+        - destination_zip
+        - weight_kg
+        - declared_value_brl
+        - incoterm
+        - service_level
+
+    CrossborderQuote:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Quote ID
+        request_id:
+          type: string
+          description: Request ID
+        operator:
+          type: string
+          description: Operator name
+          example: "correios_international"
+        service:
+          type: string
+          description: Service name
+          example: "tr8_standard"
+        origin_country:
+          type: string
+          description: Origin country
+          example: "BR"
+        destination_country:
+          type: string
+          description: Destination country
+          example: "US"
+        origin_zip:
+          type: string
+          description: Origin ZIP code
+        destination_zip:
+          type: string
+          description: Destination ZIP code
+        weight_kg:
+          type: number
+          format: float
+          description: Package weight
+        dimensions_cm:
+          $ref: '#/components/schemas/Dimensions'
+        declared_value_brl:
+          type: number
+          format: float
+          description: Declared value in BRL
+        declared_value_usd:
+          type: number
+          format: float
+          description: Declared value in USD
+        price_brl:
+          type: number
+          format: float
+          description: Shipping price in BRL
+          example: 150.00
+        price_usd:
+          type: number
+          format: float
+          description: Shipping price in USD
+          example: 30.00
+        delivery_days:
+          type: integer
+          description: Estimated delivery days
+          example: 14
+        co2_kg:
+          type: number
+          format: float
+          description: CO2 emissions in kg
+          example: 2.5
+        incoterm:
+          type: string
+          description: Incoterm
+        hs_code:
+          type: string
+          description: HS Code
+        duties_and_taxes_brl:
+          type: number
+          format: float
+          description: Duties and taxes in BRL
+          example: 25.00
+        duties_and_taxes_usd:
+          type: number
+          format: float
+          description: Duties and taxes in USD
+          example: 5.00
+        valid_until:
+          type: string
+          format: date-time
+          description: Quote validity
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+
+    TR8ShipmentRequest:
+      type: object
+      properties:
+        operator:
+          type: string
+          description: Operator name
+          example: "correios_international"
+        service:
+          type: string
+          description: Service name
+          example: "tr8_standard"
+        shipment_id:
+          type: string
+          description: Unique shipment ID
+          example: "ML-987654321"
+        origin_country:
+          type: string
+          description: Origin country
+          example: "BR"
+        destination_country:
+          type: string
+          description: Destination country
+          example: "US"
+        origin_zip:
+          type: string
+          description: Origin ZIP code
+        destination_zip:
+          type: string
+          description: Destination ZIP code
+        weight_kg:
+          type: number
+          format: float
+          description: Package weight
+        dimensions_cm:
+          $ref: '#/components/schemas/Dimensions'
+        declared_value_brl:
+          type: number
+          format: float
+          description: Declared value in BRL
+        declared_value_usd:
+          type: number
+          format: float
+          description: Declared value in USD
+        incoterm:
+          type: string
+          description: Incoterm
+        hs_code:
+          type: string
+          description: HS Code
+        product_category:
+          type: string
+          description: Product category
+        reverse_logistics_enabled:
+          type: boolean
+          description: Enable reverse logistics
+          default: false
+        recipient:
+          $ref: '#/components/schemas/Recipient'
+        customs_documents:
+          type: array
+          items:
+            type: string
+          description: List of customs document IDs
+        idempotency_key:
+          type: string
+          description: Idempotency key for duplicate prevention
+      required:
+        - operator
+        - service
+        - shipment_id
+        - origin_country
+        - destination_country
+        - origin_zip
+        - destination_zip
+        - weight_kg
+        - declared_value_brl
+        - incoterm
+
+    TR8ShipmentResponse:
+      type: object
+      properties:
+        tracking_code:
+          type: string
+          description: Tracking code
+          example: "TR812345678901"
+        label_url:
+          type: string
+          description: URL to download the shipping label
+          example: "https://rldb.gov.br/labels/abc123.pdf"
+        estimated_delivery:
+          type: string
+          format: date-time
+          description: Estimated delivery date
+        hub_route:
+          type: array
+          items:
+            type: string
+          description: Route through hubs
+          example: ["Origin Hub", "Destination Hub"]
+        shipment_id:
+          type: string
+          description: Shipment ID
+        operator:
+          type: string
+          description: Operator name
+        service:
+          type: string
+          description: Service name
+        customs_status:
+          type: string
+          description: Customs clearance status
+          example: "pending"
+        duties_and_taxes_brl:
+          type: number
+          format: float
+          description: Duties and taxes in BRL
+        duties_and_taxes_usd:
+          type: number
+          format: float
+          description: Duties and taxes in USD
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+
+    CrossborderShipment:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Shipment ID
+        shipment_id:
+          type: string
+          description: External shipment ID
+        operator:
+          type: string
+          description: Operator name
+        service:
+          type: string
+          description: Service name
+        origin_country:
+          type: string
+          description: Origin country
+        destination_country:
+          type: string
+          description: Destination country
+        origin_zip:
+          type: string
+          description: Origin ZIP code
+        destination_zip:
+          type: string
+          description: Destination ZIP code
+        weight_kg:
+          type: number
+          format: float
+          description: Package weight
+        dimensions_cm:
+          $ref: '#/components/schemas/Dimensions'
+        declared_value_brl:
+          type: number
+          format: float
+          description: Declared value in BRL
+        declared_value_usd:
+          type: number
+          format: float
+          description: Declared value in USD
+        currency:
+          type: string
+          description: Currency
+          default: BRL
+        incoterm:
+          type: string
+          description: Incoterm
+        hs_code:
+          type: string
+          description: HS Code
+        product_category:
+          type: string
+          description: Product category
+        reverse_logistics_enabled:
+          type: boolean
+          description: Enable reverse logistics
+        status:
+          type: string
+          description: Shipment status
+          example: "pending"
+        tracking_code:
+          type: string
+          description: Tracking code
+        label_url:
+          type: string
+          description: Label URL
+        estimated_delivery:
+          type: string
+          format: date-time
+          description: Estimated delivery
+        actual_delivery:
+          type: string
+          format: date-time
+          description: Actual delivery date
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Additional metadata
+
+    TR8TrackingEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Event ID
+        shipment_id:
+          type: string
+          description: Shipment ID
+        tracking_code:
+          type: string
+          description: Tracking code
+        timestamp:
+          type: string
+          format: date-time
+          description: Event timestamp
+        location:
+          type: string
+          description: Event location
+        country:
+          type: string
+          description: Event country
+        status:
+          type: string
+          description: Event status
+        operator:
+          type: string
+          description: Operator name
+        description:
+          type: string
+          description: Event description
+        customs_status:
+          type: string
+          description: Customs status
+        documents:
+          type: array
+          items:
+            type: string
+          description: Related documents
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+
+    TR8TrackingEventResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Event timestamp
+        location:
+          type: string
+          description: Event location
+        country:
+          type: string
+          description: Event country
+        status:
+          type: string
+          description: Event status
+        operator:
+          type: string
+          description: Operator name
+        description:
+          type: string
+          description: Event description
+
+    TR8TrackingResponse:
+      type: object
+      properties:
+        tracking_code:
+          type: string
+          description: Tracking code
+        status:
+          type: string
+          description: Current status
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/TR8TrackingEventResponse'
+        estimated_delivery:
+          type: string
+          format: date-time
+          description: Estimated delivery date
+        actual_delivery:
+          type: string
+          format: date-time
+          description: Actual delivery date
+        operator:
+          type: string
+          description: Operator name
+        service:
+          type: string
+          description: Service name
+        origin_country:
+          type: string
+          description: Origin country
+        destination_country:
+          type: string
+          description: Destination country
+        customs_status:
+          type: string
+          description: Customs clearance status
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomsDocumentInfo'
+
+    CustomsDocumentInfo:
+      type: object
+      properties:
+        document_type:
+          type: string
+          description: Document type
+        document_number:
+          type: string
+          description: Document number
+        status:
+          type: string
+          description: Document status
+        verified:
+          type: boolean
+          description: Whether document is verified
+        file_url:
+          type: string
+          description: URL to download document
+
+    CrossborderCustomsDocument:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Document ID
+        shipment_id:
+          type: string
+          description: Shipment ID
+        document_type:
+          type: string
+          description: Document type
+          example: "commercial_invoice"
+        document_number:
+          type: string
+          description: Document number
+        issue_date:
+          type: string
+          format: date-time
+          description: Issue date
+        expiry_date:
+          type: string
+          format: date-time
+          description: Expiry date
+        issuing_country:
+          type: string
+          description: Issuing country
+        status:
+          type: string
+          description: Document status
+        file_url:
+          type: string
+          description: URL to download document
+        verified:
+          type: boolean
+          description: Whether document is verified
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+
+    CrossborderWebhook:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Webhook ID
+        client_id:
+          type: string
+          description: Client ID
+        url:
+          type: string
+          description: Webhook URL
+          example: "https://api.shopee.com/webhooks/rldb"
+        events:
+          type: array
+          items:
+            type: string
+          description: Events to subscribe to
+          example: ["tracking.updated", "shipment.delivered"]
+        secret:
+          type: string
+          description: Webhook secret for HMAC verification
+        active:
+          type: boolean
+          description: Whether webhook is active
+          default: true
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+
+    CountryMetric:
+      type: object
+      properties:
+        country:
+          type: string
+          description: Country code
+        shipment_count:
+          type: integer
+          description: Number of shipments
+        value_brl:
+          type: number
+          format: float
+          description: Total value in BRL
+        value_usd:
+          type: number
+          format: float
+          description: Total value in USD
+        avg_delivery_days:
+          type: number
+          format: float
+          description: Average delivery days
+
+    OperatorMetric:
+      type: object
+      properties:
+        operator:
+          type: string
+          description: Operator name
+        shipment_count:
+          type: integer
+          description: Number of shipments
+        value_brl:
+          type: number
+          format: float
+          description: Total value in BRL
+        value_usd:
+          type: number
+          format: float
+          description: Total value in USD
+        avg_delivery_days:
+          type: number
+          format: float
+          description: Average delivery days
+
+    TR8MetricsResponse:
+      type: object
+      properties:
+        period:
+          type: string
+          description: Time period
+          example: "2024-01-01/2024-01-31"
+        total_shipments:
+          type: integer
+          description: Total number of shipments
+        total_value_brl:
+          type: number
+          format: float
+          description: Total value in BRL
+        total_value_usd:
+          type: number
+          format: float
+          description: Total value in USD
+        avg_delivery_days:
+          type: number
+          format: float
+          description: Average delivery days
+        on_time_delivery_rate:
+          type: number
+          format: float
+          description: On-time delivery rate
+        avg_cost_per_kg_brl:
+          type: number
+          format: float
+          description: Average cost per kg in BRL
+        avg_cost_per_kg_usd:
+          type: number
+          format: float
+          description: Average cost per kg in USD
+        co2_per_package_kg:
+          type: number
+          format: float
+          description: Average CO2 per package in kg
+        customs_clearance_rate:
+          type: number
+          format: float
+          description: Customs clearance rate
+        reverse_logistics_rate:
+          type: number
+          format: float
+          description: Reverse logistics rate
+        top_destinations:
+          type: array
+          items:
+            $ref: '#/components/schemas/CountryMetric'
+        top_operators:
+          type: array
+          items:
+            $ref: '#/components/schemas/OperatorMetric'
+
+    OperatorCompliance:
+      type: object
+      properties:
+        operator:
+          type: string
+          description: Operator name
+        requests_made:
+          type: integer
+          description: Number of requests made
+        requests_blocked:
+          type: integer
+          description: Number of requests blocked
+        data_fields_accessed:
+          type: array
+          items:
+            type: string
+          description: Data fields accessed
+        compliance_score:
+          type: number
+          format: float
+          description: Compliance score (0-1)
+
+    TR8ComplianceReport:
+      type: object
+      properties:
+        period:
+          type: string
+          description: Time period
+        generated_at:
+          type: string
+          format: date-time
+          description: Report generation timestamp
+        total_requests:
+          type: integer
+          description: Total number of requests
+        blocked_requests:
+          type: integer
+          description: Number of blocked requests
+        sanitized_fields:
+          type: integer
+          description: Number of sanitized fields
+        data_access_violations:
+          type: integer
+          description: Number of data access violations
+        audit_logs_count:
+          type: integer
+          description: Number of audit logs
+        operators:
+          type: array
+          items:
+            $ref: '#/components/schemas/OperatorCompliance'
+
+    TR8GovernanceConfig:
+      type: object
+      properties:
+        allowed_fields:
+          type: array
+          items:
+            type: string
+          description: Fields that are allowed
+        blocked_fields:
+          type: array
+          items:
+            type: string
+          description: Fields that are blocked
+        required_fields:
+          type: array
+          items:
+            type: string
+          description: Fields that are required
+        sensitive_fields:
+          type: array
+          items:
+            type: string
+          description: Sensitive fields
+        pseudonymize_fields:
+          type: array
+          items:
+            type: string
+          description: Fields to pseudonymize
+        rate_limits:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Rate limits by endpoint
+        sla_requirements:
+          type: object
+          additionalProperties:
+            type: string
+          description: SLA requirements by endpoint
+
+security:
+  - bearerAuth: []
