@@ -7,16 +7,26 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/rldb-br/rldb-api-universal/internal/config"
+	awsconfig "github.com/rldb-br/rldb-api-universal/internal/config/aws"
 	"github.com/rldb-br/rldb-api-universal/internal/handler"
+	awshandler "github.com/rldb-br/rldb-api-universal/internal/handler/aws"
 	"github.com/rldb-br/rldb-api-universal/internal/middleware"
 	"github.com/rldb-br/rldb-api-universal/internal/models"
+	awsmodels "github.com/rldb-br/rldb-api-universal/internal/models/aws"
 	"github.com/rldb-br/rldb-api-universal/internal/repository"
+	awsrepository "github.com/rldb-br/rldb-api-universal/internal/repository/aws"
 	"github.com/rldb-br/rldb-api-universal/internal/service"
+	"github.com/rldb-br/rldb-api-universal/internal/service/aws"
+	"github.com/rldb-br/rldb-api-universal/internal/service/ai"
+	"github.com/rldb-br/rldb-api-universal/internal/service/analytics"
 	"github.com/rldb-br/rldb-api-universal/pkg/governance"
 
 	"gorm.io/driver/postgres"
@@ -145,6 +155,144 @@ func main() {
 	// Initialize services
 	tr8Service := service.NewCrossborderTR8Service(tr8Repo, governanceSvc, cache, governanceConfig)
 
+	// Initialize AWS services
+	// Carregar configuracao AWS
+	awsCfg, err := awsconfig.LoadAWSConfig()
+	if err != nil {
+		log.Printf("Warning: failed to load AWS config: %v", err)
+		// Continuar sem AWS se configuracao falhar
+		awsCfg = &awsconfig.AWSConfig{
+			KinesisEnabled: false,
+			DynamoDBEnabled: false,
+			S3Enabled: false,
+			LambdaEnabled: false,
+			SageMakerEnabled: false,
+			SNSEnabled: false,
+			CloudWatchEnabled: false,
+		}
+	}
+
+	// Inicializar repositorios AWS (se habilitado)
+	var kinesisRepo *awsrepository.KinesisRepository
+	var dynamoRepo *awsrepository.DynamoDBRepository
+	var transactionStreamRepo *awsrepository.TransactionStreamRepository
+	var logStreamRepo *awsrepository.LogStreamRepository
+	var fraudDynamoRepo *awsrepository.FraudDetectionDynamoDBRepository
+	var demandDynamoRepo *awsrepository.DemandForecastDynamoDBRepository
+	var routeDynamoRepo *awsrepository.RouteOptimizationDynamoDBRepository
+
+	if awsCfg.KinesisEnabled {
+		kinesisRepo, err = awsrepository.NewKinesisRepository(
+			awsCfg.KinesisStreamName,
+			awsCfg.KinesisRegion,
+		)
+		if err != nil {
+			log.Printf("Warning: failed to create Kinesis repository: %v", err)
+		} else {
+			transactionStreamRepo = awsrepository.NewTransactionStreamRepository(kinesisRepo)
+			logStreamRepo = awsrepository.NewLogStreamRepository(kinesisRepo)
+		}
+	}
+
+	if awsCfg.DynamoDBEnabled {
+		dynamoRepo, err = awsrepository.NewDynamoDBRepository(
+			awsCfg.DynamoDBTableName,
+			awsCfg.DynamoDBRegion,
+		)
+		if err != nil {
+			log.Printf("Warning: failed to create DynamoDB repository: %v", err)
+		} else {
+			fraudDynamoRepo = awsrepository.NewFraudDetectionDynamoDBRepository(dynamoRepo)
+			demandDynamoRepo = awsrepository.NewDemandForecastDynamoDBRepository(dynamoRepo)
+			routeDynamoRepo = awsrepository.NewRouteOptimizationDynamoDBRepository(dynamoRepo)
+		}
+	}
+
+	// Inicializar servicos AWS
+	var kinesisService *awsservice.KinesisStreamService
+	if kinesisRepo != nil && transactionStreamRepo != nil && logStreamRepo != nil {
+		kinesisService = awsservice.NewKinesisStreamService(
+			kinesisRepo,
+			transactionStreamRepo,
+			logStreamRepo,
+			&awsmodels.AWSStreamConfig{
+				KinesisStreamName: awsCfg.KinesisStreamName,
+				KinesisRegion:     awsCfg.KinesisRegion,
+				S3BucketName:     awsCfg.S3Bucket,
+			},
+			5, // 5 consumer workers
+		)
+	}
+
+	// Inicializar servicos de IA
+	var fraudService *aiservice.FraudDetectionService
+	var demandService *aiservice.DemandForecastService
+	var routeService *aiservice.RouteOptimizationService
+
+	if awsCfg.AIFraudDetectionEnabled && fraudDynamoRepo != nil {
+		// Criar servico de alerta local
+		alertService := NewLocalAlertService(100)
+		fraudService = aiservice.NewFraudDetectionService(
+			fraudDynamoRepo,
+			nil, // transactionRepo (seria o repositorio principal)
+			awsCfg,
+			&awsmodels.AIModelConfig{
+				ModelName:   "rldb-fraud-detection",
+				ModelType:   "fraud",
+				EndpointURL: awsCfg.SageMakerEndpoint,
+			},
+			alertService,
+			nil, // transactionService
+		)
+	}
+
+	if awsCfg.AIDemandForecastEnabled && demandDynamoRepo != nil {
+		demandService = aiservice.NewDemandForecastService(
+			demandDynamoRepo,
+			nil, // transactionRepo
+			awsCfg,
+			&awsmodels.AIModelConfig{
+				ModelName:   "rldb-demand-forecast",
+				ModelType:   "demand",
+				EndpointURL: awsCfg.SageMakerEndpoint,
+			},
+			nil, // transactionService
+			7,  // forecast horizon days
+		)
+	}
+
+	if awsCfg.AIRouteOptimizationEnabled && routeDynamoRepo != nil {
+		// Criar servico de geocodificacao local
+		geocodingService := NewLocalGeocodingService()
+		routeService = aiservice.NewRouteOptimizationService(
+			routeDynamoRepo,
+			nil, // transactionRepo
+			awsCfg,
+			&awsmodels.AIModelConfig{
+				ModelName:   "rldb-route-optimization",
+				ModelType:   "routing",
+				EndpointURL: awsCfg.SageMakerEndpoint,
+			},
+			nil, // transactionService
+			geocodingService,
+			100, // max iterations
+		)
+	}
+
+	// Inicializar servico de analise em tempo real
+	var analyticsService *analyticsservice.RealTimeAnalyticsService
+	if awsCfg.RealTimeProcessingEnabled {
+		analyticsService = analyticsservice.NewRealTimeAnalyticsService(
+			transactionStreamRepo,
+			logStreamRepo,
+			kinesisService,
+			fraudService,
+			demandService,
+			routeService,
+			awsCfg,
+		)
+	}
+
 	// Initialize handlers
 	tr8Handler := handler.NewCrossborderTR8Handler(tr8Service)
 
@@ -224,6 +372,44 @@ func main() {
 
 	// Register TR8 routes
 	tr8Handler.RegisterRoutes(api)
+
+	// Register AWS handlers (se servicos estao disponiveis)
+	if analyticsService != nil {
+		analyticsHandler := awshandler.NewAnalyticsHandler(analyticsService)
+		analyticsHandler.RegisterRoutes(api)
+	}
+
+	if fraudService != nil {
+		fraudHandler := awshandler.NewFraudHandler(fraudService)
+		fraudHandler.RegisterRoutes(api)
+	}
+
+	if demandService != nil {
+		demandHandler := awshandler.NewDemandHandler(demandService)
+		demandHandler.RegisterRoutes(api)
+	}
+
+	if routeService != nil {
+		routingHandler := awshandler.NewRoutingHandler(routeService)
+		routingHandler.RegisterRoutes(api)
+	}
+
+	// Iniciar servicos de processamento em tempo real
+	if awsCfg.RealTimeProcessingEnabled && analyticsService != nil {
+		go func() {
+			if err := analyticsService.Start(context.Background()); err != nil {
+				log.Printf("Failed to start analytics service: %v", err)
+			}
+		}()
+	}
+
+	if awsCfg.KinesisEnabled && kinesisService != nil {
+		go func() {
+			if err := kinesisService.StartConsumers(context.Background()); err != nil {
+				log.Printf("Failed to start Kinesis consumers: %v", err)
+			}
+		}()
+	}
 
 	// Create HTTP server
 	server := &http.Server{

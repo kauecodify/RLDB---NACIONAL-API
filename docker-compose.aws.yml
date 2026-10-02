@@ -1,0 +1,309 @@
+version: '3.8'
+
+# Docker Compose para ambiente AWS com processamento em tempo real e IA/ML
+# Este arquivo estende o docker-compose.yml base com servicos AWS
+
+services:
+  # API Service (principal)
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.aws
+    container_name: rldb-api-universal-aws
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Configuracoes base
+      - SERVER_PORT=8080
+      - SERVER_TIMEOUT=30s
+      
+      # Database
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=rldb_user
+      - DB_PASSWORD=rldb_password
+      - DB_NAME=rldb_api
+      - DB_SSL_MODE=disable
+      
+      # Redis
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      
+      # JWT
+      - JWT_SECRET=rldb-secret-key-change-me
+      - JWT_ISSUER=rldb-api-universal
+      - JWT_AUDIENCE=rldb-clients
+      - JWT_REALM=RLDB API
+      - JWT_EXPIRES_IN=15m
+      
+      # Rate Limiting
+      - RATE_LIMIT_DEFAULT=100
+      - RATE_LIMIT_PER_MIN=60
+      
+      # Logging
+      - LOG_LEVEL=info
+      
+      # API
+      - API_VERSION=v1
+      - BASE_URL=https://api.rldb.gov.br
+      
+      # TR8 Crossborder
+      - TR8_ENABLED=true
+      - TR8_DEFAULT_OPERATOR=correios_international
+      - TR8_MAX_WEIGHT_KG=100.0
+      - TR8_SUPPORTED_COUNTRIES=BR,US,CN,DE,FR,UK
+      
+      # Governance
+      - GOVERNANCE_ENABLED=true
+      - AUDIT_ENABLED=true
+      
+      # AWS Configuration
+      - AWS_KINESIS_ENABLED=true
+      - AWS_KINESIS_STREAM_NAME=rldb-transactions-stream
+      - AWS_KINESIS_REGION=us-east-1
+      - AWS_KINESIS_SHARD_COUNT=4
+      - AWS_KINESIS_RETENTION_PERIOD=24
+      
+      - AWS_DYNAMODB_ENABLED=true
+      - AWS_DYNAMODB_TABLE_NAME=rldb-transactions-table
+      - AWS_DYNAMODB_REGION=us-east-1
+      - AWS_DYNAMODB_READ_CAPACITY=100
+      - AWS_DYNAMODB_WRITE_CAPACITY=100
+      
+      - AWS_S3_ENABLED=true
+      - AWS_S3_BUCKET=rldb-data-bucket
+      - AWS_S3_REGION=us-east-1
+      - AWS_S3_PREFIX=transactions
+      
+      - AWS_LAMBDA_ENABLED=true
+      - AWS_LAMBDA_REGION=us-east-1
+      - AWS_LAMBDA_MEMORY_SIZE=512
+      - AWS_LAMBDA_TIMEOUT=30
+      - AWS_LAMBDA_CONCURRENCY=100
+      
+      - AWS_SAGEMAKER_ENABLED=true
+      - AWS_SAGEMAKER_REGION=us-east-1
+      - AWS_SAGEMAKER_ENDPOINT=
+      - AWS_SAGEMAKER_MODEL=rldb-fraud-detection-model
+      
+      - AWS_SNS_ENABLED=true
+      - AWS_SNS_REGION=us-east-1
+      - AWS_SNS_FRAUD_ALERT_ARN=
+      - AWS_SNS_NOTIFICATION_ARN=
+      
+      - AWS_CLOUDWATCH_ENABLED=true
+      - AWS_CLOUDWATCH_REGION=us-east-1
+      - AWS_CLOUDWATCH_LOG_GROUP=/rldb/transactions
+      
+      - AWS_SQS_ENABLED=true
+      - AWS_SQS_REGION=us-east-1
+      - AWS_SQS_QUEUE_NAME=rldb-processing-queue
+      - AWS_SQS_MAX_RECEIVE_COUNT=3
+      - AWS_SQS_VISIBILITY_TIMEOUT=30
+      
+      # IA/ML Configuration
+      - AI_FRAUD_DETECTION_ENABLED=true
+      - AI_DEMAND_FORECAST_ENABLED=true
+      - AI_ROUTE_OPTIMIZATION_ENABLED=true
+      - AI_FRAUD_MODEL_THRESHOLD=0.7
+      - AI_DEMAND_MODEL_THRESHOLD=0.8
+      
+      # Real-time Processing
+      - REAL_TIME_PROCESSING_ENABLED=true
+      - BATCH_PROCESSING_ENABLED=false
+      - BATCH_SIZE=100
+      - BATCH_INTERVAL=5m
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    networks:
+      - rldb-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # LocalStack para desenvolvimento local (emula AWS)
+  localstack:
+    image: localstack/localstack:latest
+    container_name: rldb-localstack
+    restart: unless-stopped
+    ports:
+      - "4566:4566"     # LocalStack endpoint
+      - "4510-4559:4510-4559" # Servicos AWS
+    environment:
+      - SERVICES=kinesis,dynamodb,s3,sns,lambda,logs,cloudwatch,ec2,iam,sts
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+      - LAMBDA_EXECUTOR=docker
+      - LAMBDA_REMOTE_DOCKER=false
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./localstack-data:/tmp/localstack
+    networks:
+      - rldb-network
+    healthcheck:
+      test: ["CMD", "awslocal", "kinesis", "list-streams", "--region", "us-east-1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: rldb-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=rldb_user
+      - POSTGRES_PASSWORD=rldb_password
+      - POSTGRES_DB=rldb_api
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - rldb-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rldb_user -d rldb_api"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: rldb-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - rldb-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Stream Processor Worker (para processamento local)
+  stream-processor:
+    build:
+      context: .
+      dockerfile: Dockerfile.stream-processor
+    container_name: rldb-stream-processor
+    restart: unless-stopped
+    environment:
+      - AWS_ENDPOINT_URL=http://localstack:4566
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_KINESIS_STREAM_NAME=rldb-transactions-stream
+      - AWS_DYNAMODB_TABLE_NAME=rldb-transactions-table
+      - PROCESSING_BATCH_SIZE=100
+      - PROCESSING_INTERVAL=5s
+    depends_on:
+      - localstack
+      - postgres
+      - redis
+    networks:
+      - rldb-network
+
+  # AI/ML Service (para inferencia local)
+  ai-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.ai-service
+    container_name: rldb-ai-service
+    restart: unless-stopped
+    environment:
+      - MODEL_PATH=/app/models
+      - FRAUD_MODEL=fraud_detection_model.pkl
+      - DEMAND_MODEL=demand_forecast_model.pkl
+      - ROUTE_MODEL=route_optimization_model.pkl
+      - INFERENCE_TIMEOUT=30
+    ports:
+      - "50051:50051" # gRPC port
+    volumes:
+      - ./models:/app/models
+    networks:
+      - rldb-network
+
+  # PGAdmin (Optional, para desenvolvimento)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: rldb-pgadmin
+    restart: unless-stopped
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@rldb.gov.br
+      - PGADMIN_DEFAULT_PASSWORD=admin123
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - rldb-network
+
+  # Prometheus (Optional, para monitoramento)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: rldb-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - rldb-network
+
+  # Grafana (Optional, para monitoramento)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: rldb-grafana
+    restart: unless-stopped
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana-datasources:/etc/grafana/provisioning/datasources
+      - ./monitoring/grafana-dashboards:/etc/grafana/provisioning/dashboards
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - rldb-network
+
+  # Jupyter Notebook (para desenvolvimento de modelos)
+  jupyter:
+    image: jupyter/base-notebook:latest
+    container_name: rldb-jupyter
+    restart: unless-stopped
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./notebooks:/home/jovyan/work
+      - ./data:/home/jovyan/data
+    environment:
+      - JUPYTER_TOKEN=jupyter123
+    networks:
+      - rldb-network
+
+networks:
+  rldb-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
